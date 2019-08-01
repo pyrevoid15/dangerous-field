@@ -134,6 +134,10 @@ class Player:
                     if self.rect.colliderect(p.rect):
                         self.hp -= 5
                         self.invincibility = 50
+            for p in self.game.trapper.arrows.sprites():
+                if self.rect.colliderect(p.rect):
+                    self.hp -= 10
+                    self.invincibility = 70
             for vortal in [self.game.vortal, self.game.vortal2]:
                 for p in vortal.slaves.sprites():
                     if self.rect.colliderect(p.rect):
@@ -145,7 +149,8 @@ class Player:
                     self.invincibility = 150
 
         if self.hp < 0:
-            self.game.__init__()
+            self.hp = 100
+            # self.game.__init__()
             # I wanna know what it does.
         elif self.hp < 100:
             self.hp += 0.008 * self.energy / 36
@@ -276,30 +281,66 @@ class Trapper:
     def __init__(self, game):
         self.game = game
         self.comprect = [random.randint(game.spawn[0] + 30, 2400), random.randint(0, 2400)]
-        self.image = pygame.Surface((60, 100))
+        self.image = pygame.Surface((30, 30))
         self.image.fill((100, 100, 20))
         self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 30, 30)
-        self.speed = 0.35
-        self.mode = 'chase'
-        self.goal = [1000, 1000]
+        self.speed = 0.65
+        self.mode = 'set'
+        self.goal = [2000, 2000]
+        self.arrows = pygame.sprite.Group()
 
     def update(self):
-        pass
+        self.arrows.update()
+        if self.mode == 'set':
+            try:
+                angle = math.degrees(math.atan((self.goal[1] - self.comprect[1]) / (
+                            self.goal[0] - self.comprect[0])))
+            except ZeroDivisionError:
+                angle = 90
+
+            velx = math.sin(90 - angle) * self.speed
+            vely = math.sin(angle) * self.speed
+            self.comprect[0] += velx + (self.goal[0] - self.comprect[0]) / 400
+            self.comprect[1] += vely + (self.goal[1] - self.comprect[1]) / 400
+            self.rect.x = self.comprect[0] - self.game.offset[0]
+            self.rect.y = self.comprect[1] - self.game.offset[1]
+
+            if self.game.ticks % 50 == 0 or abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
+                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) < 300:
+                if self.game.player.velx != 0 or self.game.player.vely != 0:
+                    self.goal = [self.game.player.comprect[0] + self.game.player.velx * random.randint(350, 500),
+                                 self.game.player.comprect[1] + self.game.player.vely * random.randint(350, 500)]
+                else:
+                    self.goal = [random.randint(0, 2400), random.randint(0, 2400)]
+            if (not 0 < self.comprect[0] < 2400 and not 0 < self.comprect[1] < 2400) or\
+                    (not -200 < self.goal[0] < 2600 and not -200 < self.goal[1] < 2600):
+                self.goal = [random.randint(0, 2400), random.randint(0, 2400)]
+            if self.game.ticks % 200 == 199:
+                self.arrows.add(Arrow(self, self.game.player, 0))
+                self.arrows.sprites()[-1].image.fill((150, 150, 170))
+            if len(self.arrows.sprites()) > 30:
+                self.arrows.sprites()[random.randint(0, 10)].kill()
+            '''print(abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
+                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))),
+                  self.rect.centerx - self.game.player.rect.centerx,
+                  (self.rect.centery - self.game.player.rect.centery))'''
 
     def draw(self):
         self.game.screen.blit(self.image, self.rect)
+        for p in self.arrows.sprites():
+            p.draw()
 
 
 class Chaser:
     def __init__(self, game, teleporting=False):
         self.game = game
         self.comprect = [random.randint(game.spawn[0] + 30, 2400), random.randint(0, 2400)]
-        self.image = pygame.Surface((60, 100))
+        self.image = pygame.Surface((60, 60))
         if teleporting:
             self.image.fill((10, 10, 200))
         else:
             self.image.fill((20, 20, 20))
-        self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 30, 30)
+        self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 60, 60)
         self.speed = 0.35
         self.mode = 'chase'
         self.magic = teleporting
@@ -404,8 +445,8 @@ class Archer:
             elif self.game.player.rect.collidepoint([self.rect.centerx, self.rect.bottom + 60]):
                 self.goal_add[0] += random.randint(50, 200) * random.choice([-1, 1])
                 self.goal_add[1] += random.randint(50, 200) * random.choice([-1, 1])
-            elif abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 / (
-                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) > 400:
+            elif abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
+                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) > 420:
                 self.goal_add = [self.game.player.comprect[0] + random.randint(170, 300) * random.choice([-1, 1]),
                                  self.game.player.comprect[0] + random.randint(170, 300) * random.choice([-1, 1])]
             elif self.game.ticks % 95 < 3:  # random.choice([105, 100, 175, 200, 275, 200, 300, 300, 70, 100, 80, 85]) == 0:
@@ -553,11 +594,11 @@ class WeirdArrow(Arrow):
 class EnergyBar:
     def __init__(self, game):
         self.game = game
-        self.image = pygame.Surface((58, 8))
-        self.bk = pygame.Surface((60, 10))
+        self.image = pygame.Surface((98, 8))
+        self.bk = pygame.Surface((100, 10))
 
     def update(self):
-        self.image = pygame.Surface((int(58 * (self.game.player.energy / 70)), 8))
+        self.image = pygame.Surface((int(98 * (self.game.player.energy / 70)), 8))
         if self.game.player.energy < 10:
             self.image.fill((50, 50, 50))
         elif self.game.player.energy < 95:
@@ -573,11 +614,11 @@ class EnergyBar:
 class HealthBar:
     def __init__(self, game):
         self.game = game
-        self.image = pygame.Surface((58, 8))
-        self.bk = pygame.Surface((60, 10))
+        self.image = pygame.Surface((98, 8))
+        self.bk = pygame.Surface((100, 10))
 
     def update(self):
-        self.image = pygame.Surface((int(58 * (self.game.player.hp / 100)), 8))
+        self.image = pygame.Surface((int(98 * (self.game.player.hp / 100)), 8))
         if self.game.player.hp < 34:
             self.image.fill((200, 50, 50))
         elif self.game.player.hp < 67:
@@ -624,6 +665,7 @@ class Forest:
         for b in self.buildings:
             self.game.screen.blit(b.image, b.rect)
 
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -640,6 +682,7 @@ class Game:
         self.crazyarcher = SprayArcher(self)
         self.vortal = Vortal(self)
         self.vortal2 = Vortal(self)
+        self.trapper = Trapper(self)
         self.ground = pygame.Surface((2400, 2400))
         for j in range(0, 120):
             for i in range(0, 120):
@@ -664,7 +707,8 @@ class Game:
             self.crazyarcher.update()
             self.vortal.update()
             self.vortal2.update()
-            print(self.player.invincibility)
+            self.trapper.update()
+            print('')
 
             self.clock.tick(100)
             self.ticks = pygame.time.get_ticks()
@@ -677,6 +721,7 @@ class Game:
             self.telechaser.draw()
             self.archer.draw()
             self.crazyarcher.draw()
+            self.trapper.draw()
             self.vortal.draw()
             self.vortal2.draw()
             self.town.draw()
