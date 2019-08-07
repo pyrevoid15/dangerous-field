@@ -1,3 +1,5 @@
+import time
+
 import pygame
 import random
 import sys
@@ -16,7 +18,7 @@ class Player:
         # self.offset = game.offset
         self.image = pygame.Surface((30, 30))
         self.image.fill((0, 100, 100))
-        self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 30, 30)
+        self.rect = pygame.Rect(self.comprect[0] - game.offset[0] + 2, self.comprect[1] - game.offset[1] + 2, 26, 26)
 
         self.movx = [False, False]
         self.movy = [False, False]
@@ -44,9 +46,13 @@ class Player:
                 if e.key == pygame.K_DOWN:
                     self.movy[0] = False
                     self.movy[1] = True
-                if e.key == pygame.K_RSHIFT and self.energy > 10:
+                if (e.key == pygame.K_RSHIFT or e.key == pygame.K_LSHIFT) and self.energy > 10:
                     self.running = 6
                     self.image.fill((0, 170, 170))
+                if e.key == pygame.K_TAB:
+                    self.game.change_lvl()
+                if e.key == pygame.K_ESCAPE:
+                    self.game.pause()
             elif e.type == pygame.KEYUP:
                 if e.key == pygame.K_LEFT:
                     self.movx[0] = False
@@ -62,7 +68,6 @@ class Player:
                         self.image.fill((0, 100, 100))
                     else:
                         self.image.fill((0, 50, 50))
-
 
         if self.movx[0] and self.movx[1]:
             self.velx = 0
@@ -110,14 +115,14 @@ class Player:
         else:
             self.running = 1
 
-        if self.comprect[0] < 350:
+        if self.comprect[0] < 350 or self.game.level == 0:
             self.game.offset[0] = 0
         elif self.comprect[0] > 2050:
             self.game.offset[0] = 1700
         else:
             self.game.offset[0] = self.comprect[0] - 350
 
-        if self.comprect[1] < 350:
+        if self.comprect[1] < 350 or self.game.level == 0:
             self.game.offset[1] = 0
         elif self.comprect[1] > 2050:
             self.game.offset[1] = 1700
@@ -129,39 +134,38 @@ class Player:
             self.game.offset[1] += random.randint(-8, 8)
 
         if self.invincibility < 2 and self.running == 1:
-            for archer in [self.game.archer, self.game.crazyarcher]:
+            for archer in self.game.archers:
                 for p in archer.arrows.sprites():
                     if self.rect.colliderect(p.rect):
                         self.hp -= 5
                         self.invincibility = 50
-            for p in self.game.trapper.arrows.sprites():
-                if self.rect.colliderect(p.rect):
-                    self.hp -= 10
-                    self.invincibility = 70
-            for vortal in [self.game.vortal, self.game.vortal2]:
+            for trapper in self.game.trappers:
+                for p in trapper.arrows.sprites():
+                    if self.rect.colliderect(p.rect):
+                        self.hp -= 10
+                        self.invincibility = 70
+            for vortal in self.game.vortals:
                 for p in vortal.slaves.sprites():
                     if self.rect.colliderect(p.rect):
                         self.hp -= 6
                         self.invincibility = 55
-            for chaser in [self.game.chaser, self.game.telechaser]:
+            for chaser in self.game.chasers:
                 if self.rect.colliderect(chaser.rect):
                     self.hp -= 51
                     self.invincibility = 150
 
         if self.hp < 0:
-            self.hp = 100
-            # self.game.__init__()
-            # I wanna know what it does.
+            self.game.__init__(1, 'Game Over')
         elif self.hp < 100:
             self.hp += 0.008 * self.energy / 36
         else:
             self.hp = 100
 
-        self.rect.x = self.comprect[0] - self.game.offset[0]
-        self.rect.y = self.comprect[1] - self.game.offset[1]
+        self.rect.x = self.comprect[0] - self.game.offset[0] + 2
+        self.rect.y = self.comprect[1] - self.game.offset[1] + 2
 
     def draw(self):
-        if not 2 < self.running < 4 or not self.invincibility % 6 == 1:
+        if not 2 < self.running < 4 and not self.invincibility % 6 == 1:
             self.game.screen.blit(self.image, self.rect)
 
 
@@ -184,7 +188,7 @@ class Vortal:
             if self.game.ticks % 800 == 1:
                 self.mode = 'prepare'
         elif self.mode == 'prepare':
-            for archer in [self.game.archer, self.game.crazyarcher]:
+            for archer in self.game.archers:
                 try:
                     subject = random.choice(archer.arrows.sprites())
                     if not (subject in self.slaves):
@@ -280,7 +284,7 @@ class Vortal:
 class Trapper:
     def __init__(self, game):
         self.game = game
-        self.comprect = [random.randint(game.spawn[0] + 30, 2400), random.randint(0, 2400)]
+        self.comprect = [random.randint(1200, 2400), random.randint(0, 2400)]
         self.image = pygame.Surface((30, 30))
         self.image.fill((100, 100, 20))
         self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 30, 30)
@@ -305,11 +309,15 @@ class Trapper:
             self.rect.x = self.comprect[0] - self.game.offset[0]
             self.rect.y = self.comprect[1] - self.game.offset[1]
 
-            if self.game.ticks % 50 == 0 or abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
-                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) < 300:
+            if self.game.ticks % 10 == 0 or abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
+                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) < 400:
                 if self.game.player.velx != 0 or self.game.player.vely != 0:
-                    self.goal = [self.game.player.comprect[0] + self.game.player.velx * random.randint(350, 500),
-                                 self.game.player.comprect[1] + self.game.player.vely * random.randint(350, 500)]
+                    if random.randint(0, 100) < 5:
+                        self.goal = [self.game.player.comprect[0] + self.game.player.velx * random.randint(350, 500),
+                                     self.game.player.comprect[1] + self.game.player.vely * random.randint(350, 500)]
+                    else:
+                        self.goal = [self.game.player.comprect[0] + random.choice([-500, 500]),
+                                     self.game.player.comprect[1] + random.choice([-500, 500])]
                 else:
                     self.goal = [random.randint(0, 2400), random.randint(0, 2400)]
             if (not 0 < self.comprect[0] < 2400 and not 0 < self.comprect[1] < 2400) or\
@@ -334,7 +342,7 @@ class Trapper:
 class Chaser:
     def __init__(self, game, teleporting=False):
         self.game = game
-        self.comprect = [random.randint(game.spawn[0] + 30, 2400), random.randint(0, 2400)]
+        self.comprect = [random.randint(700, 2400), random.randint(0, 2400)]
         self.image = pygame.Surface((60, 60))
         if teleporting:
             self.image.fill((10, 10, 200))
@@ -413,7 +421,7 @@ class Chaser:
 class Archer:
     def __init__(self, game):
         self.game = game
-        self.comprect = [random.randint(game.spawn[0] + 30, 2400), random.randint(0, 2400)]
+        self.comprect = [random.randint(700, 2400), random.randint(0, 2400)]
         self.image = pygame.Surface((40, 50))
         self.shadow = pygame.Surface((20, 20))
         self.image.fill((200, 20, 20))
@@ -634,6 +642,28 @@ class HealthBar:
         self.game.screen.blit(self.image, (9, 21))
 
 
+class Text:
+    def __init__(self, text, font, color, size, x, y, surface):
+        self.screen = surface
+        pygame.font.init()
+
+        self.f = pygame.font.Font(font, size)
+        self.content = text
+        self.color = color
+        self.tex = self.f.render(self.content, True, color)
+
+        self.rect = self.tex.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+    def update(self, new_content):
+        self.content = str(new_content)
+        self.tex = self.f.render(self.content, True, self.color)
+
+    def draw(self):
+        self.screen.blit(self.tex, self.rect)
+
+
 class Tree:
     def __init__(self, game, size, position, image=None, color=(50, 170, 10)):
         self.game = game
@@ -641,7 +671,7 @@ class Tree:
         self.image.fill(color)
         self.size = size
         self.comprect = position
-        self.rect = pygame.Rect((self.comprect[0] - self.game.offset[0], self.comprect[1] - self.game.offset[1]) , size)
+        self.rect = pygame.Rect((self.comprect[0] - self.game.offset[0], self.comprect[1] - self.game.offset[1]), size)
 
     def update(self):
         self.rect.x = self.comprect[0] - self.game.offset[0]
@@ -666,8 +696,12 @@ class Forest:
             self.game.screen.blit(b.image, b.rect)
 
 
+lvlnames = ['Tutorial', 'Chased?', 'Make It Double', 'Arrows', 'Make it Triple', 'Melee and Ranged', 'Captured Arrows', 'Safe Bushes', 'Every Direction', '4 Soldiers',
+            'Arrows Everywhere', 'Deadly Traps', 'Reinforcements', "No Man's Land", 'Extra Safe Bushes', 'Targeted', 'Surrounded', 'Object Limits']
+
+
 class Game:
-    def __init__(self):
+    def __init__(self, level=0, message=' '):
         pygame.init()
 
         self.screen = pygame.display.set_mode(RESOLUTION)
@@ -676,13 +710,20 @@ class Game:
 
         self.town = Forest(self)
         self.player = Player(self)
-        self.chaser = Chaser(self)
+        self.level = level
+        self.time = 0
+        self.time_limit = 60 * 100
+        '''self.chaser = Chaser(self)
         self.telechaser = Chaser(self, True)
         self.archer = Archer(self)
         self.crazyarcher = SprayArcher(self)
         self.vortal = Vortal(self)
         self.vortal2 = Vortal(self)
-        self.trapper = Trapper(self)
+        self.trapper = Trapper(self)'''
+        self.chasers = []
+        self.archers = []
+        self.vortals = []
+        self.trappers = []
         self.ground = pygame.Surface((2400, 2400))
         for j in range(0, 120):
             for i in range(0, 120):
@@ -693,44 +734,183 @@ class Game:
 
         self.clock = pygame.time.Clock()
         self.ticks = 0
+        self.paused = False
 
         self.ebar = EnergyBar(self)
         self.hbar = HealthBar(self)
+        self.tutorialtxts = [Text("Press the arrow keys to move.", '8bfont.ttf', (255, 205, 255), 15, 50, 50, self.screen),
+                             Text("Press SHIFT to dash.", '8bfont.ttf', (255, 205, 255), 15, 50, 70, self.screen),
+                             Text("Using your dash will temporarily render you invulnerable.", '8bfont.ttf', (255, 205, 255), 15, 50, 90, self.screen),
+                             Text("Be careful. Using your dash will drain your energy.", '8bfont.ttf', (255, 205, 255), 15, 50, 110, self.screen),
+                             Text("Your objective is not to die.", '8bfont.ttf', (255, 205, 255), 15, 50, 130, self.screen)]
+        if self.level == 0:
+            self.levelcount = Text("Lvl 0 - Tutorial", '8bfont.ttf', (255, 205, 255), 21, 110, 2, self.screen)
+        else:
+            self.levelcount = Text("Lvl 1 - Chased?", '8bfont.ttf', (255, 205, 255), 21, 110, 2, self.screen)
+            self.change_lvl(self.level, message)
+        self.timer = Text("Time: %s" % int((self.time_limit - self.time) / 90), '8bfont.ttf', (255, 205, 255), 20, 570, 0, self.screen)
 
     def exist(self):
         while True:
             self.town.update()
             self.player.update()
-            self.chaser.update()
-            self.telechaser.update()
-            self.archer.update()
-            self.crazyarcher.update()
-            self.vortal.update()
-            self.vortal2.update()
-            self.trapper.update()
+            for vortal in self.vortals:
+                vortal.update()
+            for trapper in self.trappers:
+                trapper.update()
+            for chaser in self.chasers:
+                chaser.update()
+            for archer in self.archers:
+                archer.update()
             print('')
 
             self.clock.tick(100)
             self.ticks = pygame.time.get_ticks()
             self.ebar.update()
             self.hbar.update()
+            self.timer.update("Time: %s" % int((self.time_limit - self.time) / 100))
 
             self.screen.blit(self.ground, (-self.offset[0], -self.offset[1]))
+            if self.level == 0:
+                for t in self.tutorialtxts:
+                    t.draw()
             self.player.draw()
-            self.chaser.draw()
-            self.telechaser.draw()
-            self.archer.draw()
-            self.crazyarcher.draw()
-            self.trapper.draw()
-            self.vortal.draw()
-            self.vortal2.draw()
+            for vortal in self.vortals:
+                vortal.draw()
+            for trapper in self.trappers:
+                trapper.draw()
+            for chaser in self.chasers:
+                chaser.draw()
+            for archer in self.archers:
+                archer.draw()
             self.town.draw()
+
+            self.time += 1
+            if self.time == self.time_limit:
+                self.change_lvl()
 
             self.ebar.draw()
             self.hbar.draw()
+            self.levelcount.draw()
+            self.timer.draw()
 
             pygame.display.set_caption(str(self.clock.get_fps()))
             pygame.display.flip()
+
+    def change_lvl(self, level=None, message=' '):
+        if True:
+            self.chasers.clear()
+            self.archers.clear()
+            self.trappers.clear()
+            self.vortals.clear()
+            if level is None:
+                self.level += 1
+                self.screen.fill((0, 0, 30))
+                Text("Next Level", '8bfont.ttf', (255, 255, 255), 35, 255, 335, self.screen).draw()
+            else:
+                self.level = level
+                self.screen.fill((0, 0, 30))
+                Text(message, '8bfont.ttf', (255, 255, 255), 35, 255, 335, self.screen).draw()
+
+            self.levelcount.update("Lvl %s - " % self.level + lvlnames[self.level])
+            self.time = 0
+            self.player.hp = 100
+        if self.level == 1:
+            self.time_limit = 60 * 100
+            self.chasers = [Chaser(self)]
+        elif self.level == 2:
+            self.time_limit = 60 * 100
+            self.chasers = [Chaser(self), Chaser(self, True)]
+        elif self.level == 3:
+            self.time_limit = 60 * 100
+            self.archers = [Archer(self), Archer(self)]
+        elif self.level == 4:
+            self.time_limit = 90 * 100
+            self.chasers = [Chaser(self, True), Chaser(self, True), Chaser(self)]
+        elif self.level == 5:
+            self.time_limit = 90 * 100
+            self.chasers = [Chaser(self)]
+            self.archers = [Archer(self)]
+        elif self.level == 6:
+            self.time_limit = 90 * 100
+            self.vortals = [Vortal(self)]
+            self.archers = [Archer(self)]
+            self.chasers = [Chaser(self)]
+        elif self.level == 7:
+            self.time_limit = 90 * 100
+            self.vortals = [Vortal(self)]
+            self.archers = [SprayArcher(self)]
+            self.chasers = [Chaser(self)]
+        elif self.level == 8:
+            self.time_limit = 90 * 100
+            self.vortals = [Vortal(self)]
+            self.archers = [SprayArcher(self)]
+            self.chasers = [Chaser(self), Chaser(self, True)]
+        elif self.level == 9:
+            self.time_limit = 100 * 100
+            self.chasers = [Chaser(self), Chaser(self, True)]
+            self.archers = [Archer(self), SprayArcher(self)]
+        elif self.level == 10:
+            self.time_limit = 120 * 100
+            self.vortals = [Vortal(self), Vortal(self)]
+            self.archers = [SprayArcher(self), Archer(self), Archer(self)]
+        elif self.level == 11:
+            self.time_limit = 120 * 100
+            self.vortals = [Vortal(self)]
+            self.archers = [SprayArcher(self)]
+            self.chasers = [Chaser(self)]
+            self.trappers = [Trapper(self), Trapper(self)]
+        elif self.level == 12:
+            self.time_limit = 120 * 100
+            self.chasers = [Chaser(self, True), Chaser(self, True), Chaser(self)]
+            self.archers = [Archer(self)]
+            self.trappers = [Trapper(self)]
+        elif self.level == 13:
+            self.time_limit = 120 * 100
+            self.archers = [SprayArcher(self)]
+            self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
+            self.trappers = [Trapper(self), Trapper(self)]
+        elif self.level == 14:
+            self.archers = [Archer(self), Archer(self), SprayArcher(self), SprayArcher(self)]
+            self.vortals = [Vortal(self), Vortal(self)]
+        elif self.level == 15:
+            self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
+            self.archers = [Archer(self), Archer(self)]
+        elif self.level == 16:
+            self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True), Chaser(self, True)]
+            self.archers = [SprayArcher(self), SprayArcher(self)]
+        elif self.level == 17:
+            self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
+            self.trappers = [Trapper(self), Trapper(self), Trapper(self)]
+            self.archers = [SprayArcher(self), Archer(self)]
+
+
+        pygame.display.flip()
+        for _ in range(0, 200):
+            pygame.event.get()
+            self.clock.tick(100)
+
+    def pause(self):
+        self.paused = True
+        pause = pygame.Surface((700, 700))
+        pause.fill((0, 30, 0))
+        pause.set_alpha(150)
+        ps1 = pygame.Surface((12, 55))
+        ps2 = pygame.Surface((12, 55))
+        ps1.fill((255, 255, 255))
+        ps2.fill((255, 255, 255))
+        self.screen.blit(pause, (0, 0))
+        self.screen.blit(ps1, (328, 315))
+        self.screen.blit(ps2, (360, 315))
+        pygame.display.flip()
+        while self.paused:
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    sys.exit()
+                elif e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_ESCAPE:
+                        self.paused = False
+            time.sleep(0.1)
 
 
 g = Game()
