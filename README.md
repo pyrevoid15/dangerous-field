@@ -5,7 +5,9 @@ Survive through all 17 levels of various quantities of enemies and claim victory
 
 ### About the player
 -Use arrow keys to move in any direction.
+
 -Use SHIFT key to dash, giving the player invulnerability and a speed boost
+
 -Use ESCAPE to pause the game.
 
 ### Here are the enemy types that exist right now:
