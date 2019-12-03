@@ -91,7 +91,7 @@ class Player:
         self.comprect[1] += self.vely * self.running
 
         if self.energy < 70:
-            self.energy += 0.02 - (self.running - 1) / 3
+            self.energy += 0.02 - (self.running - 1) / 6
         else:
             self.running = 1
             self.energy = 69
@@ -108,6 +108,7 @@ class Player:
             self.running -= 0.2
         elif self.running > 1:
             if self.energy > 10:
+                
                 self.image.fill((0, 100, 100))
             else:
                 self.image.fill((0, 50, 50))
@@ -142,7 +143,7 @@ class Player:
             for trapper in self.game.trappers:
                 for p in trapper.arrows.sprites():
                     if self.rect.colliderect(p.rect):
-                        self.hp -= 10
+                        self.hp -= 12
                         self.invincibility = 70
             for vortal in self.game.vortals:
                 for p in vortal.slaves.sprites():
@@ -151,11 +152,17 @@ class Player:
                         self.invincibility = 55
             for chaser in self.game.chasers:
                 if self.rect.colliderect(chaser.rect):
-                    self.hp -= 51
+                    if chaser.obj:
+                        self.hp -= 25
+                    else:
+                        self.hp -= 51
                     self.invincibility = 150
 
         if self.hp < 0:
-            self.game.__init__(1, 'Game Over')
+            if self.game.level >= 0:
+                self.game.__init__(1, 'Game Over')
+            else:
+                self.game.__init__(-1, 'Oof')
         elif self.hp < 100:
             self.hp += 0.008 * self.energy / 36
         else:
@@ -340,79 +347,104 @@ class Trapper:
 
 
 class Chaser:
-    def __init__(self, game, teleporting=False):
+    def __init__(self, game, teleporting=False, obj=False):
         self.game = game
         self.comprect = [random.randint(700, 2400), random.randint(0, 2400)]
-        self.image = pygame.Surface((60, 60))
-        if teleporting:
-            self.image.fill((10, 10, 200))
+        self.obj = obj
+
+        if self.obj:
+            self.image = pygame.Surface((35, 35))
+            self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 35, 35)
+            self.image.fill((200, 170, 10))
+
+            self.velocity = 10
+            self.angle = random.randint(-180, 180)
         else:
-            self.image.fill((20, 20, 20))
-        self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 60, 60)
+            self.image = pygame.Surface((60, 60))
+            if teleporting:
+                self.image.fill((10, 10, 200))
+            else:
+                self.image.fill((20, 20, 20))
+            self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 60, 60)
+
         self.speed = 0.35
         self.mode = 'chase'
         self.magic = teleporting
         self.goal = [1000, 1000]
 
     def update(self):
-        if self.mode == 'chase':
-            try:
-                angle = math.degrees(math.atan((self.game.player.comprect[1] - self.comprect[1]) / (
-                            self.game.player.comprect[0] - self.comprect[0])))
-            except ZeroDivisionError:
-                angle = 90
-
-            velx = math.sin(90 - angle) * self.speed
-            vely = math.sin(angle) * self.speed
-            if self.magic:
-                velx += random.randint(-1000, 1001) / 2000
-                vely += random.randint(-1000, 1001) / 2000
-
-            if self.magic:
-                self.comprect[0] += velx + (self.game.player.comprect[0] + self.game.player.velx * 8 - self.comprect[0]) / 400
-                self.comprect[1] += vely + (self.game.player.comprect[1] + self.game.player.vely * 8 - self.comprect[1]) / 400
-            else:
-                self.comprect[0] += velx + (self.game.player.comprect[0] - self.comprect[0]) / 400
-                self.comprect[1] += vely + (self.game.player.comprect[1] - self.comprect[1]) / 400
+        if self.obj:
+            self.comprect[0] += self.velocity * math.cos(self.angle)
+            self.comprect[1] += self.velocity * math.sin(self.angle)
             self.rect.x = self.comprect[0] - self.game.offset[0]
             self.rect.y = self.comprect[1] - self.game.offset[1]
-            if self.game.ticks % 7000 < 100 and random.randint(0, 9999) < 2000 and abs(math.sqrt(
-                    (self.rect.centerx - self.game.player.rect.centerx) ** 2 / (
-                            (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) < 900:
-                self.goal = [(self.game.player.comprect[0] - self.comprect[0]) * 2.4 + self.game.player.comprect[
-                    0] + random.randint(-200, 201),
-                             (self.game.player.comprect[1] - self.comprect[1]) * 2.2 + self.game.player.comprect[
-                                 1] + random.randint(-200, 201)]
-                self.mode = 'charge'
-            if self.game.ticks % 598 == 0 and self.magic:
-                if random.randint(0, 100) < 30:
-                    if random.randint(0, 100) < 40:
-                        self.comprect[0] = random.randint(0, 2400)
-                        self.comprect[1] = random.randint(0, 2400)
-                    else:
-                        if random.randint(0, 100) < 55:
-                            self.comprect[0] = random.randint(0, 2400)
-                        else:
-                            self.comprect[1] = random.randint(0, 2400)
-                else:
-                    if self.game.player.velx != 0:
-                        self.comprect[0] = self.game.player.comprect[
-                                               0] + self.game.player.velx * self.game.player.running ** 0.7 * 350
-                    if self.game.player.vely != 0:
-                        self.comprect[1] = self.game.player.comprect[
-                                               1] + self.game.player.vely * self.game.player.running ** 0.7 * 350
+
+            if self.comprect[1] - 11 < 0 or self.comprect[1] + 11 > 2400:
+                self.angle *= -1
+            elif self.comprect[0] - 11 < 0:
+                self.angle = 180 - self.angle
+            elif self.comprect[0] + 11 > 2400:
+                self.angle = -180 + self.angle
+
         else:
-            self.comprect[0] += (self.goal[0] - self.comprect[0]) / 300
-            self.comprect[1] += (self.goal[1] - self.comprect[1]) / 300
-            self.rect.x = self.comprect[0] - self.game.offset[0]
-            self.rect.y = self.comprect[1] - self.game.offset[1]
-            if self.game.ticks % 4500 < 10:
-                self.mode = 'chase'
-            elif self.game.ticks % 4000 == 1:
-                self.goal = [(self.game.player.comprect[0] - self.comprect[0]) * 2.4 + self.game.player.comprect[
-                    0] + random.randint(-200, 201),
-                             (self.game.player.comprect[1] - self.comprect[1]) * 2.2 + self.game.player.comprect[
-                                 1] + random.randint(-200, 201)]
+            if self.mode == 'chase':
+                try:
+                    angle = math.degrees(math.atan((self.game.player.comprect[1] - self.comprect[1]) / (
+                                self.game.player.comprect[0] - self.comprect[0])))
+                except ZeroDivisionError:
+                    angle = 90
+
+                velx = math.sin(90 - angle) * self.speed
+                vely = math.sin(angle) * self.speed
+                if self.magic:
+                    velx += random.randint(-1000, 1001) / 2000
+                    vely += random.randint(-1000, 1001) / 2000
+
+                if self.magic:
+                    self.comprect[0] += velx + (self.game.player.comprect[0] + self.game.player.velx * 8 - self.comprect[0]) / 400
+                    self.comprect[1] += vely + (self.game.player.comprect[1] + self.game.player.vely * 8 - self.comprect[1]) / 400
+                else:
+                    self.comprect[0] += velx + (self.game.player.comprect[0] - self.comprect[0]) / 400
+                    self.comprect[1] += vely + (self.game.player.comprect[1] - self.comprect[1]) / 400
+                self.rect.x = self.comprect[0] - self.game.offset[0]
+                self.rect.y = self.comprect[1] - self.game.offset[1]
+                if self.game.ticks % 7000 < 100 and random.randint(0, 9999) < 2000 and abs(math.sqrt(
+                        (self.rect.centerx - self.game.player.rect.centerx) ** 2 / (
+                                (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) < 900:
+                    self.goal = [(self.game.player.comprect[0] - self.comprect[0]) * 2.4 + self.game.player.comprect[
+                        0] + random.randint(-200, 201),
+                                 (self.game.player.comprect[1] - self.comprect[1]) * 2.2 + self.game.player.comprect[
+                                     1] + random.randint(-200, 201)]
+                    self.mode = 'charge'
+                if self.game.ticks % 598 == 0 and self.magic:
+                    if random.randint(0, 100) < 30:
+                        if random.randint(0, 100) < 40:
+                            self.comprect[0] = random.randint(0, 2400)
+                            self.comprect[1] = random.randint(0, 2400)
+                        else:
+                            if random.randint(0, 100) < 55:
+                                self.comprect[0] = random.randint(0, 2400)
+                            else:
+                                self.comprect[1] = random.randint(0, 2400)
+                    else:
+                        if self.game.player.velx != 0:
+                            self.comprect[0] = self.game.player.comprect[
+                                                   0] + self.game.player.velx * self.game.player.running ** 0.7 * 350
+                        if self.game.player.vely != 0:
+                            self.comprect[1] = self.game.player.comprect[
+                                                   1] + self.game.player.vely * self.game.player.running ** 0.7 * 350
+            else:
+                self.comprect[0] += (self.goal[0] - self.comprect[0]) / 300
+                self.comprect[1] += (self.goal[1] - self.comprect[1]) / 300
+                self.rect.x = self.comprect[0] - self.game.offset[0]
+                self.rect.y = self.comprect[1] - self.game.offset[1]
+                if self.game.ticks % 4500 < 10:
+                    self.mode = 'chase'
+                elif self.game.ticks % 4000 == 1:
+                    self.goal = [(self.game.player.comprect[0] - self.comprect[0]) * 2.4 + self.game.player.comprect[
+                        0] + random.randint(-200, 201),
+                                 (self.game.player.comprect[1] - self.comprect[1]) * 2.2 + self.game.player.comprect[
+                                     1] + random.randint(-200, 201)]
 
     def draw(self):
         self.game.screen.blit(self.image, self.rect)
@@ -609,10 +641,10 @@ class EnergyBar:
         self.image = pygame.Surface((int(98 * (self.game.player.energy / 70)), 8))
         if self.game.player.energy < 10:
             self.image.fill((50, 50, 50))
-        elif self.game.player.energy < 95:
+        elif self.game.player.energy < 68:
             self.image.fill((20, 20, 200))
         else:
-            self.image.fill((0, 15, 255))
+            self.image.fill((0, 255, 255))
 
     def draw(self):
         self.game.screen.blit(self.bk, (8, 8))
@@ -701,7 +733,7 @@ lvlnames = ['Tutorial', 'Chased?', 'Make It Double', 'Arrows', 'Make it Triple',
 
 
 class Game:
-    def __init__(self, level=0, message=' '):
+    def __init__(self, level=-1, message=' '):
         pygame.init()
 
         self.screen = pygame.display.set_mode(RESOLUTION)
@@ -745,6 +777,9 @@ class Game:
                              Text("Your objective is not to die.", '8bfont.ttf', (255, 205, 255), 15, 50, 130, self.screen)]
         if self.level == 0:
             self.levelcount = Text("Lvl 0 - Tutorial", '8bfont.ttf', (255, 205, 255), 21, 110, 2, self.screen)
+        elif self.level == -1:
+            self.levelcount = Text("Lvl X - Debug", '8bfont.ttf', (255, 205, 255), 21, 110, 2, self.screen)
+            self.change_lvl(self.level, message)
         else:
             self.levelcount = Text("Lvl 1 - Chased?", '8bfont.ttf', (255, 205, 255), 21, 110, 2, self.screen)
             self.change_lvl(self.level, message)
@@ -762,7 +797,6 @@ class Game:
                 chaser.update()
             for archer in self.archers:
                 archer.update()
-            print('')
 
             self.clock.tick(100)
             self.ticks = pygame.time.get_ticks()
@@ -786,7 +820,7 @@ class Game:
             self.town.draw()
 
             self.time += 1
-            if self.time == self.time_limit:
+            if self.time == self.time_limit and self.level >= 0:
                 self.change_lvl()
 
             self.ebar.draw()
@@ -807,12 +841,18 @@ class Game:
                 self.level += 1
                 self.screen.fill((0, 0, 30))
                 Text("Next Level", '8bfont.ttf', (255, 255, 255), 35, 255, 335, self.screen).draw()
+            elif level == -1:
+                self.screen.fill((0, 220, 255))
+                Text(message, '8bfont.ttf', (255, 255, 255), 35, 255, 335, self.screen).draw()
             else:
                 self.level = level
                 self.screen.fill((0, 0, 30))
                 Text(message, '8bfont.ttf', (255, 255, 255), 35, 255, 335, self.screen).draw()
 
-            self.levelcount.update("Lvl %s - " % self.level + lvlnames[self.level])
+            if self.level >= 0:
+                self.levelcount.update("Lvl %s - " % self.level + lvlnames[self.level])
+            else:
+                self.levelcount.update("Lvl X - Debug")
             self.time = 0
             self.player.hp = 100
         if self.level == 1:
@@ -871,19 +911,29 @@ class Game:
             self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
             self.trappers = [Trapper(self), Trapper(self)]
         elif self.level == 14:
+            self.time_limit = 120 * 100
             self.archers = [Archer(self), Archer(self), SprayArcher(self), SprayArcher(self)]
             self.vortals = [Vortal(self), Vortal(self)]
         elif self.level == 15:
+            self.time_limit = 120 * 100
             self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
             self.archers = [Archer(self), Archer(self)]
         elif self.level == 16:
+            self.time_limit = 120 * 100
             self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True), Chaser(self, True)]
             self.archers = [SprayArcher(self), SprayArcher(self)]
         elif self.level == 17:
+            self.time_limit = 120 * 100
             self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True)]
             self.trappers = [Trapper(self), Trapper(self), Trapper(self)]
             self.archers = [SprayArcher(self), Archer(self)]
-
+        elif self.level == -1:
+            self.time_limit = 6000 * 100
+            self.chasers = [Chaser(self), Chaser(self, True), Chaser(self, True),
+                            Chaser(self, obj=True), Chaser(self, obj=True)]
+            self.trappers = [Trapper(self), Trapper(self), Trapper(self)]
+            self.archers = [SprayArcher(self), Archer(self), Archer(self)]
+            self.vortals = [Vortal(self), Vortal(self)]
 
         pygame.display.flip()
         for _ in range(0, 200):
