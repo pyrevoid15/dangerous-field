@@ -1,7 +1,7 @@
 # dangerous-field
 A bullet-hell-esque game of my creation.
 
-Survive through all 17 levels of various quantities of enemies and claim victory.  I may add more later, but this is what there is right now.
+Survive through all 17 levels of various quantities of enemies and claim victory.  I may add more later, but this is what there is right now.  By default, the game is may be set to the debug level.  To actually progress through the game, change the starting level tag in the Game class to 0.
 
 ### About the player
 -Use arrow keys to move in any direction.
