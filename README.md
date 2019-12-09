@@ -15,6 +15,8 @@ Survive through all 17 levels of various quantities of enemies and claim victory
 
 -Chaser(special): Similarly to the normal Chaser, this enemy will follow the player and eventually charge the player.  However, this enemy will also occassionally teleport to a different location.  As a result, this enemy often teams up with the normal Chaser and other special Chasers.
 
+-Tumbleweed:  Bounces off from walls at light speed...
+
 -Archer(normal): This normal archer will move around and shoot projectiles directly toward the player.  These projectiles can be blocked by bushes littered throughout the world.  Darker projectiles are faster than normal and will **NOT** be blocked by bushes.
 
 -Archer(crazy): This enemy is similar to the archer, but will not shoot directly at the player.  It will shoot in every direction.
