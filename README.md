@@ -24,3 +24,5 @@ Survive through all 17 levels of various quantities of enemies and claim victory
 -Vortal:  This enemy occasionally captures projectiles from Archer-type enemies (denoted by red color) and will either disperse them immediately in a direction directly away from itself or will move them toward itself to be ejected diagonally or directly vertical or horizontal in direction.
 
 -Trapper: This enemy will attempt to avoid the player, but will will lay mines in its travels.
+
+-Laserist: This enemy will move from place to place, often releasing one or more blue lasers that deal damage on contact without invincibility frames.  The end of the laser does instant damage comparable to a trapper's mine.  When shooting its lasers, it may rotate, allowing it to sweep large areas of the field.  Standing close to the laserist when it is shooting deals damage.  A wider area around the laserist allows the player to gain energy faster.
