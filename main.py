@@ -8,6 +8,7 @@ import math
 RESOLUTION = (700, 700)
 
 white = (255, 255, 255)
+ss = pygame.image.load('spreadsheet.png')
 
 
 class Player:
@@ -16,9 +17,10 @@ class Player:
 
         self.comprect = game.spawn
         # self.offset = game.offset
-        self.image = pygame.Surface((30, 30))
-        self.image.fill((0, 100, 100))
+        self.image = ss.subsurface(0, 0, 30, 30)
+        # self.image.fill((0, 100, 100))
         self.rect = pygame.Rect(self.comprect[0] - game.offset[0] + 2, self.comprect[1] - game.offset[1] + 2, 26, 26)
+        self.effectradius = 250
 
         self.movx = [False, False]
         self.movy = [False, False]
@@ -28,6 +30,7 @@ class Player:
         self.energy = 69
         self.hp = 100
         self.invincibility = 0
+        self.god_mode = False
 
     def update(self):
         for e in pygame.event.get():
@@ -53,6 +56,11 @@ class Player:
                     self.game.change_lvl()
                 if e.key == pygame.K_ESCAPE:
                     self.game.pause()
+                if self.game.level == -1 and e.key == pygame.K_h:
+                    if self.god_mode:
+                        self.god_mode = False
+                    else:
+                        self.god_mode = True
             elif e.type == pygame.KEYUP:
                 if e.key == pygame.K_LEFT:
                     self.movx[0] = False
@@ -134,6 +142,9 @@ class Player:
             self.game.offset[0] += random.randint(-7, 8)
             self.game.offset[1] += random.randint(-8, 8)
 
+        if self.god_mode:
+            self.invincibility = 5
+
         if self.invincibility < 2 and self.running == 1:
             for archer in self.game.archers:
                 for p in archer.arrows.sprites():
@@ -157,6 +168,18 @@ class Player:
                     else:
                         self.hp -= 51
                     self.invincibility = 150
+            for laserist in self.game.laserists:
+                if 50 < math.sqrt((laserist.rect.centerx - self.rect.centerx) ** 2 + (laserist.rect.centery - self.rect.centery) ** 2) < self.effectradius and laserist.mode == 'active':
+                    self.energy += 0.1
+                elif 70 > math.sqrt((laserist.rect.centerx - self.rect.centerx) ** 2 + (laserist.rect.centery - self.rect.centery) ** 2):
+                    self.hp -= 0.3
+
+                for l in laserist.lasers:
+                    if l.check_collision(self):
+                        self.hp -= 0.5
+                    if self.rect.collidepoint(l.endpoint):
+                        self.hp -= 15
+                        self.invincibility = 50
 
         if self.hp < 0:
             if self.game.level >= 0:
@@ -172,7 +195,7 @@ class Player:
         self.rect.y = self.comprect[1] - self.game.offset[1] + 2
 
     def draw(self):
-        if not 2 < self.running < 4 and not self.invincibility % 6 == 1:
+        if not 2 < self.running < 4 and not self.invincibility % 6 == 2:
             self.game.screen.blit(self.image, self.rect)
 
 
@@ -388,6 +411,7 @@ class Chaser:
 
         else:
             if self.mode == 'chase':
+                self.goal = [self.game.player.comprect[0], self.game.player.comprect[1]]
                 try:
                     angle = math.degrees(math.atan((self.game.player.comprect[1] - self.comprect[1]) / (
                                 self.game.player.comprect[0] - self.comprect[0])))
@@ -448,6 +472,191 @@ class Chaser:
 
     def draw(self):
         self.game.screen.blit(self.image, self.rect)
+
+
+class Laserist:
+    def __init__(self, game, mobility=True, rotility=True, laser_num=1):
+        self.game = game
+        self.comprect = [random.randint(700, 2400), random.randint(0, 2400)]
+        self.image = pygame.Surface((40, 50))
+        self.image.fill((50, 175, 210))
+        self.rect = pygame.Rect(self.comprect[0] - game.offset[0], self.comprect[1] - game.offset[1], 30, 30)
+        self.speed = 0.4
+        self.mode = 'inactive'
+        self.goal = [0, 0]
+
+        try:
+            for a in game.archers:
+                self.goal[0] += a.goal_add[0]
+                self.goal[1] += a.goal_add[1]
+            self.goal[0] = int(self.goal[0] / len(game.archers))
+            self.goal[1] = int(self.goal[1] / len(game.archers))
+        except ZeroDivisionError:
+            self.goal = [random.randint(0, 2400), random.randint(0, 2400)]
+
+        self.mobility = mobility
+        self.rotility = rotility
+        self.angvel = random.randint(-1, 1)
+        self.laser_num = laser_num
+        self.lasers = []
+        self.angle = 0
+        self.progress = 0
+
+    def update(self):
+        for l in self.lasers:
+            l.update(self.rotility)
+
+        if self.mode == 'inactive':
+            self.comprect[0] += (self.goal[0] - self.comprect[0]) / 270
+            self.comprect[1] += (self.goal[1] - self.comprect[1]) / 275
+            self.rect.x = self.comprect[0] - self.game.offset[0]
+            self.rect.y = self.comprect[1] - self.game.offset[1]
+
+            self.angle = math.atan2(self.comprect[1] - self.game.player.comprect[1], self.comprect[0] - self.game.player.comprect[0])
+
+            if not 0 < self.goal[0] < 2400 or not 0 < self.goal[1] < 2400:
+                self.goal[0] += random.randint(50, 200) * random.choice([-1, 1])
+                self.goal[1] += random.randint(50, 200) * random.choice([-1, 1])
+
+            if self.rect.collidepoint(self.goal[0], self.goal[1]) or\
+                    self.rect.colliderect(self.game.player.rect):
+                self.goal[0] += random.randint(9, 30) * random.choice([-1, 1])
+                self.goal[1] += random.randint(9, 30) * random.choice([-1, 1])
+
+            if self.game.ticks % 400 == 0 and random.randint(0, 100) < 55:
+                self.mode = 'active'
+
+                for l in self.lasers:
+                    if random.randint(0, 100) < 80:
+                        del l
+                    else:
+                        l.endpoint = [l.startpoint[0], l.startpoint[1]]
+
+                if len(self.lasers) > 3:
+                    self.lasers.clear()
+
+                for _ in range(0, self.laser_num):
+                    self.lasers.append(Laser(self))
+                for l in self.lasers:
+                    l.rollcall()
+
+                if self.mobility:
+                    self.goal = [0, 0]
+                    if random.randint(0, 100) < 40 and len(self.game.archers) > 0:
+                        a = random.choice(self.game.archers)
+                        self.goal = [a.comprect[0] + 1, a.comprect[1] + 1]
+                    elif random.randint(0, 100) < 40:
+                        self.goal = [self.game.player.comprect[0], self.game.player.comprect[1] + random.randint(-300, 300)]
+                    else:
+                        self.goal = [random.randint(0, 2000), random.randint(0, 2000)]
+
+                self.angvel = random.randint(-1, 1)
+
+            elif self.game.player.rect.collidepoint([self.rect.centerx, self.rect.bottom + 60]):
+                self.goal[0] += random.randint(50, 200) * random.choice([-1, 1])
+                self.goal[1] += random.randint(50, 200) * random.choice([-1, 1])
+            elif abs(math.sqrt((self.rect.centerx - self.game.player.rect.centerx) ** 2 + (
+                    (self.rect.centery - self.game.player.rect.centery) ** 2 + 1))) > 420:
+                self.goal = [self.game.player.comprect[0] + random.randint(170, 300) * random.choice([-1, 1]),
+                             self.game.player.comprect[0] + random.randint(170, 300) * random.choice([-1, 1])]
+        else:
+            self.rect.x = self.comprect[0] - self.game.offset[0]
+            self.rect.y = self.comprect[1] - self.game.offset[1]
+
+            if self.rotility:
+                self.angle += self.angvel * math.pi / 360
+
+            if self.mobility:
+                self.comprect[0] += (self.goal[0] - self.comprect[0]) / 270
+                self.comprect[1] += (self.goal[1] - self.comprect[1]) / 275
+
+                for l in self.game.laserists:
+                    if l is not self:
+                        if self.rect.colliderect(l.rect):
+                            self.goal[0] += random.randint(-300, 300)
+                            self.goal[1] += random.randint(-300, 300)
+
+            if self.game.ticks % 700 == 0 and random.randint(0, 100) < 20:
+                self.mode = 'inactive'
+                self.goal[0] = self.game.player.comprect[0]
+                self.laser_num += 1
+                if self.laser_num > 4:
+                    self.laser_num = 1
+
+    def draw(self):
+        self.game.screen.blit(self.image, self.rect)
+        for l in self.lasers:
+            l.draw()
+
+
+class Laser:
+    def __init__(self, source):
+        self.source = source
+        self.angle = random.choice([source.angle, math.radians(random.randint(0, 359))])
+        self.id = len(source.lasers)
+
+        self.progress = 0
+        self.progress2 = 0
+        self.startpoint = [source.comprect[0] + int(source.rect.height / 2), source.comprect[1] + 5]
+        self.endpoint = self.startpoint
+        self.speed = 5
+        self.mode = 'active'
+        # self.colliderect = pygame.Rect((0, 0), (1, 1))
+
+    def rollcall(self):
+        if len(self.source.lasers) > 1:
+            self.angle += self.id * math.pi / len(self.source.lasers)
+
+    def update(self, tracking=False):
+        self.progress += 1
+
+        if self.source.mode == 'inactive' or self.mode == 'inactive':
+            self.progress2 += 1
+            self.mode = 'inactive'
+            self.startpoint = [self.startpoint[0] + math.cos(self.angle) * self.progress2,
+                               self.startpoint[1] + math.sin(self.angle) * self.progress2]
+            self.endpoint = [self.endpoint[0] + math.cos(self.angle) * self.progress,
+                             self.endpoint[1] + math.sin(self.angle) * self.progress]
+
+            if random.randint(0, 100) < 2:
+                del self
+
+        else:
+            if tracking:
+                self.angle = self.source.angle
+                self.rollcall()
+
+            self.startpoint = [self.source.comprect[0] + int(self.source.rect.height / 2),
+                               self.source.comprect[1] + 5]
+            self.endpoint = [self.startpoint[0] + math.cos(self.angle) * self.speed * self.progress,
+                             self.startpoint[1] + math.sin(self.angle) * self.speed * self.progress]
+
+            if not 0 < self.startpoint[0] < 2400 or not 0 < self.startpoint[1] < 2400:
+                del self
+
+    def check_collision(self, obj):
+        m = math.tan(self.angle)
+        x = obj.comprect[0] + obj.rect.width / 2 - self.startpoint[0]
+        y = m * x + self.startpoint[1]
+
+        if self.startpoint[0] < self.endpoint[0] and self.startpoint[0] < obj.comprect[0] + obj.rect.width < self.endpoint[0]:
+            if abs(y - obj.comprect[1] - obj.rect.height / 2) < 30:
+                return True
+            else:
+                return False
+        elif self.endpoint[0] < obj.comprect[0] + obj.rect.width < self.startpoint[0]:
+            if abs(y - obj.comprect[1] - obj.rect.height / 2) < 30:
+                return True
+            else:
+                return False
+
+    def draw(self):
+        pygame.draw.line(self.source.game.screen, [0, 180, 200],
+                         [self.startpoint[0] - self.source.game.offset[0], self.startpoint[1] - self.source.game.offset[1]],
+                         [self.endpoint[0] - self.source.game.offset[0], self.endpoint[1] - self.source.game.offset[1]], 28)
+        pygame.draw.line(self.source.game.screen, [0, 255, 255],
+                         [self.startpoint[0] - self.source.game.offset[0], self.startpoint[1] - self.source.game.offset[1]],
+                         [self.endpoint[0] - self.source.game.offset[0], self.endpoint[1] - self.source.game.offset[1]], 12)
 
 
 class Archer:
@@ -674,6 +883,17 @@ class HealthBar:
         self.game.screen.blit(self.image, (9, 21))
 
 
+def debugfx(game):
+    for c in game.chasers:
+        pygame.draw.line(game.screen, [0, 0, 0], c.rect.center, [c.goal[0] - game.offset[0], c.goal[1] - game.offset[1]])
+    for a in game.archers:
+        pygame.draw.line(game.screen, [255, 0, 0], a.rect.center, [a.goal_add[0] - game.offset[0], a.goal_add[1] - game.offset[1]])
+    for t in game.trappers:
+        pygame.draw.line(game.screen, [255, 120, 0], t.rect.center, [t.goal[0] - game.offset[0], t.goal[1] - game.offset[1]])
+    for l in game.laserists:
+        pygame.draw.line(game.screen, [0, 255, 255], l.rect.center, [l.goal[0] - game.offset[0], l.goal[1] - game.offset[1]])
+
+
 class Text:
     def __init__(self, text, font, color, size, x, y, surface):
         self.screen = surface
@@ -737,6 +957,7 @@ class Game:
         pygame.init()
 
         self.screen = pygame.display.set_mode(RESOLUTION)
+        pygame.display.set_icon(pygame.image.load('runman.png'))
         self.spawn = [350, 350]
         self.offset = [0, 0]
 
@@ -756,6 +977,7 @@ class Game:
         self.archers = []
         self.vortals = []
         self.trappers = []
+        self.laserists = []
         self.ground = pygame.Surface((2400, 2400))
         for j in range(0, 120):
             for i in range(0, 120):
@@ -787,6 +1009,8 @@ class Game:
 
     def exist(self):
         while True:
+            print(self.offset, self.player.comprect)
+
             self.town.update()
             self.player.update()
             for vortal in self.vortals:
@@ -797,6 +1021,8 @@ class Game:
                 chaser.update()
             for archer in self.archers:
                 archer.update()
+            for laserist in self.laserists:
+                laserist.update()
 
             self.clock.tick(100)
             self.ticks = pygame.time.get_ticks()
@@ -817,11 +1043,16 @@ class Game:
                 chaser.draw()
             for archer in self.archers:
                 archer.draw()
+            for laserist in self.laserists:
+                laserist.draw()
             self.town.draw()
 
             self.time += 1
             if self.time == self.time_limit and self.level >= 0:
                 self.change_lvl()
+
+            if self.level == -1:
+                debugfx(self)
 
             self.ebar.draw()
             self.hbar.draw()
@@ -837,6 +1068,7 @@ class Game:
             self.archers.clear()
             self.trappers.clear()
             self.vortals.clear()
+            self.laserists.clear()
             if level is None:
                 self.level += 1
                 self.screen.fill((0, 0, 30))
@@ -934,6 +1166,7 @@ class Game:
             self.trappers = [Trapper(self), Trapper(self), Trapper(self)]
             self.archers = [SprayArcher(self), Archer(self), Archer(self)]
             self.vortals = [Vortal(self), Vortal(self)]
+            self.laserists = [Laserist(self), Laserist(self), Laserist(self)]
 
         pygame.display.flip()
         for _ in range(0, 200):
