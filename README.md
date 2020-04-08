@@ -1,12 +1,14 @@
 # dangerous-field
 A bullet-hell-esque game of my creation.
 
-Survive through all 17 levels of various quantities of enemies and claim victory.  I may add more later, but this is what there is right now.  By default, the game is may be set to the debug level.  To actually progress through the game, change the starting level tag in the Game class to 0.
+Survive through all 17 levels of various quantities of enemies and claim victory.  I may add more later, but this is what there is right now.  By default, the game may be set to the debug level.  To actually progress through the game, change the starting level tag in the Game class to 0.  As I continue to add things to this game, this will change.
 
 ### About the player
 -Use arrow keys to move in any direction.
 
--Use SHIFT key to dash, giving the player invulnerability and a speed boost
+-Use SHIFT key to dash, giving the player invulnerability and a speed boost at the cost of energy.
+
+-Dashing can only be done if the player has energy, which replenishes over time.
 
 -Use ESCAPE to pause the game.
 
